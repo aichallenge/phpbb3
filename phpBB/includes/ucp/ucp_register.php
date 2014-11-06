@@ -425,6 +425,64 @@ class ucp_register
 						$db->sql_freeresult($result);
 					}
 				}
+				//deltree's SPAM BLOCKER
+				$userCheck = @file_get_contents("http://www.stopforumspam.com/api?ip=" .
+					$user_row['user_ip'] . "&email=" . $user_row['user_email'] .
+					"&username=" . $user_row['username']) or false;
+					//gather output on user from stopforumspam
+				if ($userCheck)
+				{
+					$patt = '@<(([^>\s]+)[^>]*)>(.+)<\/\2>@';	//regex
+					preg_match_all($patt, $userCheck, $match, PREG_SET_ORDER);
+						//divide up output from stopforumspam, it's xml
+					$ip_spam = false;	//initialize variables as false, not a spammer yet
+					$email_spam = false;
+					$user_spam = false;
+					$i = 1;
+					foreach($match as $key => $value)
+					{
+						if ($i == 1 && $key == 1 && $value[3] == "yes")
+						{	//ip matched, spammer
+							$ip_spam = true;	//comment this line to stop blocking ips
+							$i++;
+						}
+						else if ($i == 2 && $value[1] == "appears" && $value[3] == "yes")
+						{	//email matched, spammer
+							$email_spam = true;	//comment this line to stop blocking emails
+							$i++;			//not recommended!
+						}
+						else if ($i == 3 && $value[1] == "appears" && $value[3] == "yes")
+						{	//username matched, spammer
+							//$user_spam = true;	//comment this line to stop blocking
+							$i++;			//usernames, already done
+						}
+						else if ($i == 1 && $value[1] == "appears")
+						{
+							$i++;
+						}
+						else if ($i == 2 && $value[1] == "appears")
+						{
+							$i++;
+						}
+						else if ($i == 3 && $value[1] == "appears")
+						{
+							$i++;
+						}
+					}
+					if ($ip_spam || $email_spam || $user_spam)	//if anything matched
+					{	//edit the if statement to require multiple matches instead of singles
+							user_ban('ip',$user_row['user_ip'], 0, "", false, "Spammer");	//ban user by ip
+							user_delete('remove', $user_id);	//delete user, removing all posts
+							//$userCheck = file_get_contents('http://www.stopforumspam.com/add.php?username=' . urlencode($user_row['username']) . '&ip_addr=' . $user_row['user_ip'] . '&email=' . urlencode($user_row['user_email']) . '&api_key=**ADD API KEY HERE**');
+							//submit the username, email, and ip to stopforumspam
+					}
+				}
+				else
+				{	//error checking
+					user_delete('remove', $user_id);
+					trigger_error('Could not check user.  Please register again.', E_USER_WARNING);
+				}
+				//End SPAM BLOCKER
 
 				$message = $message . '<br /><br />' . sprintf($user->lang['RETURN_INDEX'], '<a href="' . append_sid("{$phpbb_root_path}index.$phpEx") . '">', '</a>');
 				trigger_error($message);
